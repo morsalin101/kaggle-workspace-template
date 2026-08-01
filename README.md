@@ -7,8 +7,7 @@ browser or memorise a `kaggle` CLI flag again.
 git clone https://github.com/<you>/kaggle-workspace-template
 cd kaggle-workspace-template
 
-cp .env.example .env   # paste in your Kaggle username + API key
-make setup             # builds .venv, installs deps, verifies the key
+make setup             # asks for your Kaggle key + first project name
 
 make new P=titanic     # scaffold a project
 make push P=titanic    # upload + run it on Kaggle
@@ -73,27 +72,58 @@ cd kaggle-workspace-template
 > [kaggle.com/settings](https://www.kaggle.com/settings) — GPU/TPU accelerators
 > and internet access are unavailable on unverified accounts.
 
-### 3. Add the key and run setup
+### 3. Run setup — it asks for everything it needs
 
 ```bash
-cp .env.example .env      # then open .env and paste in your username + key
 make setup
 ```
 
-That's the whole install. `make setup`:
-
-1. creates a `.venv/` in the repo,
-2. installs `kaggle` and `PyYAML` into it,
-3. writes `~/.kaggle/kaggle.json` with `600` permissions,
-4. makes a live API call and prints your username on success.
+No file editing required. It prompts you:
 
 ```
 ==> Creating virtualenv in .venv/
 ==> Installing Python dependencies
-==> Writing Kaggle credentials
-    wrote /Users/you/.kaggle/kaggle.json (permissions 600)
+    dependencies installed
+==> Kaggle credentials
+    Get them at kaggle.com -> Settings -> API -> Create New Token.
+    Tip: you can paste the whole contents of kaggle.json below.
+
+    Kaggle username (or paste kaggle.json): your-name
+    Kaggle API key (hidden):
+    wrote .env
+    wrote /Users/you/.kaggle/kaggle.json
 ==> Verifying credentials against Kaggle
-    authenticated as your-username
+    authenticated as your-name
+==> First project
+    Name for a new project (blank to skip): unet
+    created projects/unet/
+
+Setup complete.
+Write your code in projects/unet/notebook.ipynb, then:
+  make push P=unet
+```
+
+That single command creates `.venv/`, installs `kaggle` and `PyYAML`, saves your
+credentials to both `.env` and `~/.kaggle/kaggle.json` (mode `600`), checks them
+against the live API, and scaffolds your first project.
+
+**Shortcut:** at the username prompt you can paste the entire contents of the
+`kaggle.json` you just downloaded — `{"username":"...","key":"..."}` — instead
+of typing the two fields. The key itself is never echoed to the screen.
+
+Re-running `make setup` is safe: it reuses the credentials it already has rather
+than asking again. To enter different ones:
+
+```bash
+make setup RECONFIGURE=1
+```
+
+**Prefer files over prompts?** Create `.env` first (`cp .env.example .env`) and
+setup will use it without asking anything. For CI or scripts:
+
+```bash
+make setup NO_INPUT=1              # never prompt; fail if credentials are missing
+make setup P=unet NO_INPUT=1       # also scaffold a project, unattended
 ```
 
 > **You never need to activate the venv.** Every `make` target reaches into
@@ -460,7 +490,7 @@ Run `make` with no arguments to see this list in your terminal.
 
 | Command | What it does |
 |---|---|
-| `make setup` | Install deps, write credentials, verify them against Kaggle. |
+| `make setup` | Create `.venv`, install deps, ask for credentials + a first project, verify. |
 | `make new P=<name>` | Scaffold a new project folder. |
 | `make add URL=<link>` | Attach a dataset/competition/model by pasting its Kaggle link. |
 | `make rm URL=<link>` | Detach a source, by link or by the short name `make sources` shows. |

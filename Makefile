@@ -41,7 +41,8 @@ help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
 		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 	@echo ""
-	@echo "  Options:  P=<project>  WAIT=1  M=\"note\"  TIMEOUT=<sec>  FORCE=1  REMOTE=1"
+	@echo "  Options:  P=<project>  URL=<link>  WAIT=1  M=\"note\"  TIMEOUT=<sec>"
+	@echo "            FORCE=1  REMOTE=1  WATCH=1  RECONFIGURE=1  NO_INPUT=1"
 	@echo "  Example:  make push P=dl-finetune WAIT=1"
 	@echo ""
 
@@ -54,8 +55,10 @@ setup: ## One-time: create .venv, install deps, write credentials, verify
 			echo "Or choose another interpreter:  make setup PYTHON=/path/to/python3"; \
 			exit 1; }; \
 	fi
-	@P=$$(ls $(VENV)/bin/python $(VENV)/Scripts/python.exe 2>/dev/null | head -1); \
-		"$$P" -m pip install --quiet --upgrade pip && "$$P" -m kwt setup
+	@VP=$$(ls $(VENV)/bin/python $(VENV)/Scripts/python.exe 2>/dev/null | head -1); \
+		"$$VP" -m pip install --quiet --upgrade pip && \
+		"$$VP" -m kwt setup $(if $(RECONFIGURE),--reconfigure,) \
+			$(if $(P),--project "$(P)",) $(if $(NO_INPUT),--no-input,)
 
 new: ## Create a new project folder            (make new P=my-run)
 	@test -n "$(P)" || { echo "Usage: make new P=<project-name>"; exit 1; }

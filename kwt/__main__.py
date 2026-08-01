@@ -7,6 +7,7 @@ directly too: `python -m kwt push my-project`.
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import os
 import re
@@ -55,6 +56,81 @@ def fail(message: str) -> None:
 # --------------------------------------------------------------------------
 
 
+def _interactive(args: argparse.Namespace) -> bool:
+    """Only prompt when a human is actually there to answer."""
+    return not args.no_input and sys.stdin.isatty()
+
+
+def _ask(question: str, *, secret: bool = False, default: str = "") -> str:
+    try:
+        answer = getpass.getpass(question) if secret else input(question)
+    except EOFError:
+        return default
+    return answer.strip() or default
+
+
+def _ask_credentials() -> tuple[str, str]:
+    """Prompt for a username and key, accepting a pasted kaggle.json too."""
+    say("    Get them at kaggle.com -> Settings -> API -> Create New Token.")
+    say("    Tip: you can paste the whole contents of kaggle.json below.")
+    say()
+
+    while True:
+        first = _ask("    Kaggle username (or paste kaggle.json): ")
+        if not first:
+            say("    A username is required.\n")
+            continue
+
+        # Pasted the downloaded token file rather than typing the fields.
+        if first.startswith("{"):
+            try:
+                blob = json.loads(first)
+                username, key = blob["username"].strip(), blob["key"].strip()
+            except (json.JSONDecodeError, KeyError, AttributeError):
+                say("    That looked like JSON but had no username/key in it.\n")
+                continue
+            say(f"    read username '{username}' and key from the pasted JSON")
+            return username, key
+
+        key = _ask("    Kaggle API key (hidden): ", secret=True)
+        if not key:
+            say("    A key is required.\n")
+            continue
+        if len(key) < 20:
+            say(f"    That key is only {len(key)} characters — Kaggle's are 32.")
+            if not _ask("    Use it anyway? [y/N]: ").lower().startswith("y"):
+                say()
+                continue
+        return first, key
+
+
+def _write_env(username: str, key: str) -> Path:
+    """Persist credentials to .env so setup only has to ask once."""
+    path = config.ENV_FILE
+    lines = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
+
+    updated = {"KAGGLE_USERNAME": False, "KAGGLE_KEY": False}
+    values = {"KAGGLE_USERNAME": username, "KAGGLE_KEY": key}
+    for index, line in enumerate(lines):
+        for name in values:
+            if re.match(rf"^\s*{name}\s*=", line):
+                lines[index] = f"{name}={values[name]}"
+                updated[name] = True
+
+    if not any(updated.values()) and not lines:
+        lines = ["# Kaggle credentials. This file is gitignored — never commit it."]
+    for name, done in updated.items():
+        if not done:
+            lines.append(f"{name}={values[name]}")
+
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    try:
+        path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    except OSError:
+        pass  # Windows and some filesystems don't support this; harmless.
+    return path
+
+
 def cmd_setup(args: argparse.Namespace) -> None:
     step("Installing Python dependencies")
     requirements = REPO_ROOT / "requirements.txt"
@@ -65,18 +141,37 @@ def cmd_setup(args: argparse.Namespace) -> None:
         fail("pip install failed. Check the output above.")
     say("    dependencies installed")
 
-    step("Writing Kaggle credentials")
+    step("Kaggle credentials")
+    have: tuple[str, str] | None = None
     try:
-        username, key = config.credentials()
-    except ConfigError as exc:
-        fail(str(exc))
+        have = config.credentials()
+    except ConfigError:
+        have = None
+
+    if have and not args.reconfigure:
+        say(f"    using the credentials already configured for '{have[0]}'")
+        say("    (run `make setup RECONFIGURE=1` to enter different ones)")
+        username, key = have
+    elif _interactive(args):
+        username, key = _ask_credentials()
+        env_path = _write_env(username, key)
+        say(f"    wrote {env_path.relative_to(REPO_ROOT)}")
+    else:
+        fail(
+            "No Kaggle credentials found and nothing to prompt with.\n"
+            "  cp .env.example .env, fill in KAGGLE_USERNAME and KAGGLE_KEY,\n"
+            "  then run `make setup` again."
+        )
 
     config_dir = Path(os.environ.get("KAGGLE_CONFIG_DIR", Path.home() / ".kaggle"))
     config_dir.mkdir(parents=True, exist_ok=True)
     token = config_dir / "kaggle.json"
     token.write_text(json.dumps({"username": username, "key": key}), encoding="utf-8")
-    token.chmod(stat.S_IRUSR | stat.S_IWUSR)  # 0600 — the CLI warns otherwise
-    say(f"    wrote {token} (permissions 600)")
+    try:
+        token.chmod(stat.S_IRUSR | stat.S_IWUSR)  # 0600 — the CLI warns otherwise
+    except OSError:
+        pass
+    say(f"    wrote {token}")
 
     step("Verifying credentials against Kaggle")
     try:
@@ -85,14 +180,46 @@ def cmd_setup(args: argparse.Namespace) -> None:
         fail(str(exc))
     say(f"    authenticated as {who}")
 
+    created = _setup_first_project(args)
+
     projects = config.list_projects()
     say()
-    if projects:
-        say("Setup complete. Existing projects: " + ", ".join(projects))
+    say("Setup complete.")
+    if created:
+        say(f"Write your code in projects/{created}/notebook.ipynb, then:")
+        say(f"  make push P={created}")
+    elif projects:
+        say("Projects: " + ", ".join(projects))
         say(f"Next:  make push P={projects[0]}")
     else:
-        say("Setup complete.")
         say("Next:  make new P=my-first-project")
+
+
+def _setup_first_project(args: argparse.Namespace) -> str | None:
+    """Offer to scaffold a project as the last step of setup."""
+    if args.project:
+        wanted = args.project
+    elif _interactive(args):
+        step("First project")
+        existing = config.list_projects()
+        if existing:
+            say("    You already have: " + ", ".join(existing))
+        wanted = _ask("    Name for a new project (blank to skip): ")
+    else:
+        return None
+
+    if not wanted:
+        return None
+
+    try:
+        scaffold.create(wanted)
+    except ConfigError as exc:
+        # A bad name here shouldn't undo a successful credential setup.
+        say(f"    skipped: {exc}")
+        return None
+
+    say(f"    created projects/{wanted}/")
+    return wanted
 
 
 # --------------------------------------------------------------------------
@@ -498,6 +625,17 @@ def build_parser() -> argparse.ArgumentParser:
         return p
 
     s = sub.add_parser("setup", help="install deps, write credentials, verify them")
+    s.add_argument(
+        "--reconfigure",
+        action="store_true",
+        help="ask for credentials again even if some are already configured",
+    )
+    s.add_argument(
+        "--project", default=None, help="also scaffold this project, without asking"
+    )
+    s.add_argument(
+        "--no-input", action="store_true", help="never prompt (for scripts and CI)"
+    )
     s.set_defaults(func=cmd_setup)
 
     s = sub.add_parser("new", help="scaffold a new project folder")
