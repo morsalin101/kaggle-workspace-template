@@ -139,6 +139,19 @@ make setup P=unet NO_INPUT=1       # also scaffold a project, unattended
 > exist, `make` falls back to whatever `python3` is active. Point setup at a
 > specific interpreter with `make setup PYTHON=/path/to/python3`.
 
+### What you actually need
+
+| | |
+|---|---|
+| **Python 3.9+** | The only hard requirement. `make setup` refuses older versions with a clear message rather than a confusing pip error. |
+| **`git`** | To clone. Downloading the ZIP works too. |
+| **`make`** | *Optional* — a convenience wrapper. Everything works without it via `python -m kwt`. |
+
+Nothing is compiled and there is no OS-specific code: `kwt` is plain Python, and
+it shells out to the official `kaggle` CLI. `pip` picks a `kaggle` release that
+matches your Python (2.x on 3.11+, 1.7.x on 3.9–3.10) — both expose the commands
+this tool uses.
+
 ### Which OS does this work on?
 
 | | Status |
@@ -148,6 +161,8 @@ make setup P=unet NO_INPUT=1       # also scaffold a project, unattended
 | **Windows + WSL** | Works as written — treat it as Linux. **This is the recommended way to use Windows.** |
 | **Windows + Git Bash** | Works if you install `make`; the venv layout (`Scripts/` vs `bin/`) is handled. |
 | **Windows, native `cmd`/PowerShell** | `make` does not exist. Use the Python CLI directly — see below. |
+
+So: **the Python side is OS-independent; only `make` isn't.**
 
 **Every `make` target is a thin wrapper over the same Python CLI**, so nothing
 is lost without `make`. The mapping is one-to-one:

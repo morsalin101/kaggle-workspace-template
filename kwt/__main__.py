@@ -131,7 +131,18 @@ def _write_env(username: str, key: str) -> Path:
     return path
 
 
+MIN_PYTHON = (3, 9)
+
+
 def cmd_setup(args: argparse.Namespace) -> None:
+    if sys.version_info < MIN_PYTHON:
+        fail(
+            f"Python {'.'.join(map(str, MIN_PYTHON))}+ is required; this is "
+            f"{sys.version.split()[0]} at {sys.executable}.\n"
+            "Point setup at a newer interpreter:\n"
+            "  make setup PYTHON=/path/to/python3.11"
+        )
+
     step("Installing Python dependencies")
     requirements = REPO_ROOT / "requirements.txt"
     result = subprocess.run(
