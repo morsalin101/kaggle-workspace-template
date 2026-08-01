@@ -52,9 +52,12 @@ def _executable() -> str:
     `kaggle` from some other Python often is. Checking next to sys.executable
     first keeps the CLI and its library in the same environment.
     """
-    sibling = Path(sys.executable).parent / "kaggle"
-    if sibling.is_file() and os.access(sibling, os.X_OK):
-        return str(sibling)
+    # bin/ on POSIX, Scripts/ on Windows — and .exe there.
+    bindir = Path(sys.executable).parent
+    for name in ("kaggle", "kaggle.exe"):
+        sibling = bindir / name
+        if sibling.is_file() and os.access(sibling, os.X_OK):
+            return str(sibling)
 
     exe = shutil.which("kaggle")
     if exe:

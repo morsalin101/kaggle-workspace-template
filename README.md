@@ -105,6 +105,40 @@ That's the whole install. `make setup`:
 > exist, `make` falls back to whatever `python3` is active. Point setup at a
 > specific interpreter with `make setup PYTHON=/path/to/python3`.
 
+### Which OS does this work on?
+
+| | Status |
+|---|---|
+| **macOS** | Works as written. `make` ships with the Xcode command line tools. |
+| **Linux** | Works as written. On Debian/Ubuntu you may need `sudo apt install make python3-venv` first. |
+| **Windows + WSL** | Works as written — treat it as Linux. **This is the recommended way to use Windows.** |
+| **Windows + Git Bash** | Works if you install `make`; the venv layout (`Scripts/` vs `bin/`) is handled. |
+| **Windows, native `cmd`/PowerShell** | `make` does not exist. Use the Python CLI directly — see below. |
+
+**Every `make` target is a thin wrapper over the same Python CLI**, so nothing
+is lost without `make`. The mapping is one-to-one:
+
+```powershell
+py -m venv .venv
+.venv\Scripts\python -m pip install -r requirements.txt
+
+.venv\Scripts\python -m kwt setup
+.venv\Scripts\python -m kwt new unet
+.venv\Scripts\python -m kwt add "https://www.kaggle.com/datasets/owner/name" -p unet
+.venv\Scripts\python -m kwt push unet
+.venv\Scripts\python -m kwt output unet
+```
+
+| Make | Python CLI |
+|---|---|
+| `make new P=unet` | `python -m kwt new unet` |
+| `make add P=unet URL=<link>` | `python -m kwt add <link> -p unet` |
+| `make push P=unet WAIT=1` | `python -m kwt push unet --wait` |
+| `make output P=unet` | `python -m kwt output unet` |
+| `make sources P=unet` | `python -m kwt sources unet` |
+
+> `P=` also accepts lowercase `p=`, and `URL=` accepts `url=`.
+
 `.env` is gitignored. **Never commit your key** — if you do, revoke it
 immediately with *Expire API Token* on the same settings page.
 

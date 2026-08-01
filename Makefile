@@ -8,12 +8,19 @@
 PYTHON ?= python3
 VENV   ?= .venv
 
+# Windows venvs put the interpreter in Scripts/, POSIX ones in bin/. Look for
+# both so the same Makefile works under WSL, Git Bash, Linux and macOS.
+VENV_PY := $(firstword $(wildcard $(VENV)/bin/python $(VENV)/Scripts/python.exe))
+
 # Use the project venv when it exists, otherwise whatever python3 is active.
 # You never have to `source .venv/bin/activate` — `make setup` builds it and
 # every target reaches into it directly.
-PY  := $(shell [ -x "$(VENV)/bin/python" ] && echo "$(VENV)/bin/python" || echo "$(PYTHON)")
+PY  := $(if $(VENV_PY),$(VENV_PY),$(PYTHON))
 KWT := $(PY) -m kwt
-P   ?=
+
+# Accept lowercase p=/url= too — the uppercase form is easy to forget.
+P   ?= $(p)
+URL ?= $(url)
 
 # Optional flags, e.g.  make push P=x WAIT=1 M="new features"
 WAIT_FLAG    := $(if $(WAIT),--wait,)
@@ -39,15 +46,16 @@ help: ## Show this help
 	@echo ""
 
 setup: ## One-time: create .venv, install deps, write credentials, verify
-	@test -x "$(VENV)/bin/python" || { \
+	@if [ -z "$(VENV_PY)" ]; then \
 		echo "==> Creating virtualenv in $(VENV)/"; \
 		$(PYTHON) -m venv $(VENV) || { \
 			echo "Could not create a virtualenv with '$(PYTHON)'."; \
-			echo "Install python3-venv, or point at another interpreter:"; \
-			echo "  make setup PYTHON=/path/to/python3"; exit 1; }; \
-	}
-	@$(VENV)/bin/python -m pip install --quiet --upgrade pip
-	@$(VENV)/bin/python -m kwt setup
+			echo "On Debian/Ubuntu:  sudo apt install python3-venv"; \
+			echo "Or choose another interpreter:  make setup PYTHON=/path/to/python3"; \
+			exit 1; }; \
+	fi
+	@P=$$(ls $(VENV)/bin/python $(VENV)/Scripts/python.exe 2>/dev/null | head -1); \
+		"$$P" -m pip install --quiet --upgrade pip && "$$P" -m kwt setup
 
 new: ## Create a new project folder            (make new P=my-run)
 	@test -n "$(P)" || { echo "Usage: make new P=<project-name>"; exit 1; }
