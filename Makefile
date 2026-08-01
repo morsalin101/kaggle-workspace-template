@@ -61,13 +61,15 @@ new: ## Create a new project folder            (make new P=my-run)
 	@test -n "$(P)" || { echo "Usage: make new P=<project-name>"; exit 1; }
 	@$(KWT) new $(P)
 
+# URL is quoted so query strings (?select=a&b=c) survive the shell. Several
+# links can still go in one call — separate them with spaces or commas.
 add: ## Attach data by pasting its Kaggle link  (make add URL=<link>)
 	@test -n "$(URL)" || { echo 'Usage: make add URL="https://www.kaggle.com/datasets/owner/name"'; exit 1; }
-	@$(KWT) add $(URL) $(if $(P),-p $(P),)
+	@$(KWT) add "$(URL)" $(if $(P),-p $(P),)
 
 rm: ## Detach a source by link or slug         (make rm URL=<link>)
 	@test -n "$(URL)" || { echo 'Usage: make rm URL="owner/dataset-name"'; exit 1; }
-	@$(KWT) rm $(URL) $(if $(P),-p $(P),)
+	@$(KWT) rm "$(URL)" $(if $(P),-p $(P),)
 
 sources: ## Show everything this project attaches
 	@$(KWT) sources $(P)

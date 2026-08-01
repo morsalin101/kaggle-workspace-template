@@ -34,9 +34,14 @@ language: python          # python | r | rmarkdown
 kernel_type: notebook     # notebook | script
 
 private: true             # false publishes the notebook
-accelerator: none         # none | gpu | tpu
-                          #   Which GPU (T4 x2 vs P100) is chosen in Kaggle's UI;
-                          #   the API can only turn the accelerator on or off.
+accelerator: gpu          # none | gpu | tpu
+                          #   The API can only turn the accelerator on or off.
+                          #   The exact hardware (GPU T4 x2 vs P100, or which TPU)
+                          #   is a dropdown in Kaggle's notebook editor:
+                          #     make push  ->  cancel the auto-run  ->  pick the
+                          #     hardware in the sidebar  ->  "Save & Run All"
+                          #   Keep this set to gpu/tpu even when you pick in the UI:
+                          #   every push rewrites the on/off switch from this file.
 internet: true            # false = no network inside the run (required by some comps)
 
 # ---------------------------------------------------------------------------

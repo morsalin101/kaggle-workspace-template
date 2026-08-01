@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -156,11 +157,28 @@ def _config_path(project: str | None) -> tuple[str, Path]:
     return name, PROJECTS_DIR / name / CONFIG_NAME
 
 
+def _expand(raw_args: list[str]) -> list[str]:
+    """Split each argument on whitespace and commas.
+
+    The Makefile passes URL="..." as a single quoted argument — quoting is what
+    stops a `?select=a&b=c` query string from being mangled by the shell — so
+    several links arrive glued together. Splitting here keeps both working.
+    """
+    items: list[str] = []
+    for raw in raw_args:
+        items.extend(part for part in re.split(r"[\s,]+", raw.strip()) if part)
+    return items
+
+
 def cmd_add(args: argparse.Namespace) -> None:
     name, path = _config_path(args.project)
     added: list[tuple[str, str]] = []
 
-    for raw in args.urls:
+    urls = _expand(args.urls)
+    if not urls:
+        fail('No link given. Try: make add URL="https://www.kaggle.com/datasets/owner/name"')
+
+    for raw in urls:
         try:
             kind, slug = links.parse(raw)
         except links.LinkError as exc:
@@ -211,7 +229,7 @@ def _resolve_attached(path: Path, raw: str) -> tuple[str, str]:
 
 def cmd_rm(args: argparse.Namespace) -> None:
     name, path = _config_path(args.project)
-    for raw in args.urls:
+    for raw in _expand(args.urls):
         try:
             kind, slug = _resolve_attached(path, raw)
         except links.LinkError as exc:

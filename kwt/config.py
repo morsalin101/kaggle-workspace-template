@@ -61,7 +61,9 @@ DEFAULTS: dict = {
     "language": "python",
     "kernel_type": "notebook",
     "private": True,
-    "accelerator": "none",
+    # GPU by default: this workspace exists to run things Kaggle's hardware is
+    # good for. Set `accelerator: none` per project to stay on CPU quota.
+    "accelerator": "gpu",
     "internet": True,
     "sources": {
         "datasets": [],

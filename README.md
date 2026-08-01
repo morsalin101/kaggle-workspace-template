@@ -209,7 +209,7 @@ language: python            # python | r | rmarkdown
 kernel_type: notebook       # notebook | script
 
 private: true
-accelerator: none           # none | gpu | tpu
+accelerator: gpu            # none | gpu | tpu
 internet: true
 
 sources:
@@ -245,7 +245,7 @@ output:
 | `language` | `python` | `python`, `r`, or `rmarkdown`. |
 | `kernel_type` | `notebook` | `notebook` (`.ipynb`) or `script` (`.py`). |
 | `private` | `true` | `false` publishes the notebook publicly. |
-| `accelerator` | `none` | `none`, `gpu`, or `tpu`. See the note below. |
+| `accelerator` | `gpu` | `none`, `gpu`, or `tpu`. See the note below. |
 | `internet` | `true` | `false` disables network inside the run — required by some competitions. |
 | `sources.datasets` | `[]` | Datasets to attach: `"owner/dataset-slug"`. |
 | `sources.competitions` | `[]` | Competition data to attach: `"titanic"`. |
@@ -262,31 +262,56 @@ output:
 | `push.timeout` | `null` | Hard cap on run length, in seconds. |
 | `output.dir` | `outputs` | Where `make output` downloads to. |
 
-### Choosing a GPU (T4 ×2 vs P100)
+### Choosing the hardware (GPU T4 ×2, P100, or TPU)
 
-Kaggle's API can only switch the accelerator **on or off** — the *type* is a
-dropdown in Kaggle's own notebook editor and is not part of the metadata. So:
+**New projects default to `accelerator: gpu`.** Kaggle's API can only switch the
+accelerator **on or off** — the exact hardware is a dropdown in Kaggle's own
+notebook editor, not something metadata can express.
 
-```yaml
-accelerator: gpu     # in config.yml — this part is required
+If the default is what you want, there is no UI step at all:
+
+```bash
+make push P=titanic     # pushes and runs on GPU
 ```
+
+Verified on a real run: with `accelerator: gpu` and nothing chosen in the UI,
+Kaggle provisioned a **Tesla P100-PCIE-16GB**. That is its default.
+
+#### Picking specific hardware (T4 ×2, or a particular TPU)
 
 ```bash
 make push P=titanic
 ```
 
-Then open the notebook on Kaggle, pick **GPU T4 ×2** in the sidebar, and hit
-**Save Version** to run it there.
+1. `make push` uploads **and immediately starts a run** — the Kaggle API has no
+   "upload without running" option.
+2. Open the notebook on Kaggle and **cancel that run** so it doesn't eat quota.
+3. Pick **GPU T4 ×2** or **TPU VM** in the sidebar.
+4. Hit **Save & Run All (Commit)**.
 
-> **Set `accelerator: gpu` in `config.yml` even though you pick the type in the
-> UI.** `kernel-metadata.json` is authoritative on every push: if it says
-> `enable_gpu: false`, the next `make push` switches the accelerator back off,
-> whatever you chose in the browser. The *type* is not in the metadata, so it is
-> left alone — but the on/off switch is.
+`make status` and `make output P=titanic` still work on that run — it's the same
+notebook, so results come back the usual way.
 
-Verified on a real run: with `accelerator: gpu` and nothing selected in the UI,
-Kaggle provisioned a **Tesla P100-PCIE-16GB**. That is the default; switching to
-T4 ×2 is the UI step above.
+> **Keep `accelerator` set to `gpu` (or `tpu`) in `config.yml` even though you
+> pick the hardware in the UI.** `kernel-metadata.json` is authoritative on
+> every push: if it says `enable_gpu: false`, the next `make push` switches the
+> accelerator back off, whatever you chose in the browser. The *type* is not in
+> the metadata, so that part is left alone — but the on/off switch is.
+
+#### If you always want TPU
+
+Skip the UI dance entirely — set it in `config.yml` and push:
+
+```yaml
+accelerator: tpu
+```
+
+The cancel-and-select routine is only needed to choose a specific *variant*
+(T4 ×2 vs P100, or a particular TPU version).
+
+> **Watch your quota.** GPU is roughly 30 hours/week and TPU about 20, both
+> reset weekly. Because the default is now `gpu`, a project you meant to run on
+> CPU will consume GPU hours — set `accelerator: none` on those.
 
 ---
 
