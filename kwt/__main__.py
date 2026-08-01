@@ -185,14 +185,22 @@ def cmd_setup(args: argparse.Namespace) -> None:
     projects = config.list_projects()
     say()
     say("Setup complete.")
-    if created:
-        say(f"Write your code in projects/{created}/notebook.ipynb, then:")
-        say(f"  make push P={created}")
-    elif projects:
+    say()
+
+    target = created or (projects[0] if projects else None)
+    if target is None:
+        say("Next:")
+        say("  1. Create a project   make new P=my-first-project")
+        return
+
+    if not created and projects:
         say("Projects: " + ", ".join(projects))
-        say(f"Next:  make push P={projects[0]}")
-    else:
-        say("Next:  make new P=my-first-project")
+        say()
+    say("Next:")
+    say(f'  1. Attach data    make add P={target} URL="<paste a Kaggle dataset link>"')
+    say(f"  2. Write code     projects/{target}/notebook.ipynb  (helpers in src/)")
+    say(f"  3. Run on Kaggle  make push P={target}")
+    say(f"  4. Get results    make output P={target}")
 
 
 def _setup_first_project(args: argparse.Namespace) -> str | None:

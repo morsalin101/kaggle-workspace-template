@@ -99,8 +99,12 @@ No file editing required. It prompts you:
     created projects/unet/
 
 Setup complete.
-Write your code in projects/unet/notebook.ipynb, then:
-  make push P=unet
+
+Next:
+  1. Attach data    make add P=unet URL="<paste a Kaggle dataset link>"
+  2. Write code     projects/unet/notebook.ipynb  (helpers in src/)
+  3. Run on Kaggle  make push P=unet
+  4. Get results    make output P=unet
 ```
 
 That single command creates `.venv/`, installs `kaggle` and `PyYAML`, saves your
