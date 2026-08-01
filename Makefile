@@ -6,8 +6,14 @@
 # =============================================================================
 
 PYTHON ?= python3
-KWT    := $(PYTHON) -m kwt
-P      ?=
+VENV   ?= .venv
+
+# Use the project venv when it exists, otherwise whatever python3 is active.
+# You never have to `source .venv/bin/activate` — `make setup` builds it and
+# every target reaches into it directly.
+PY  := $(shell [ -x "$(VENV)/bin/python" ] && echo "$(VENV)/bin/python" || echo "$(PYTHON)")
+KWT := $(PY) -m kwt
+P   ?=
 
 # Optional flags, e.g.  make push P=x WAIT=1 M="new features"
 WAIT_FLAG    := $(if $(WAIT),--wait,)
@@ -32,8 +38,16 @@ help: ## Show this help
 	@echo "  Example:  make push P=dl-finetune WAIT=1"
 	@echo ""
 
-setup: ## One-time: install deps, write ~/.kaggle/kaggle.json from .env, verify
-	@$(KWT) setup
+setup: ## One-time: create .venv, install deps, write credentials, verify
+	@test -x "$(VENV)/bin/python" || { \
+		echo "==> Creating virtualenv in $(VENV)/"; \
+		$(PYTHON) -m venv $(VENV) || { \
+			echo "Could not create a virtualenv with '$(PYTHON)'."; \
+			echo "Install python3-venv, or point at another interpreter:"; \
+			echo "  make setup PYTHON=/path/to/python3"; exit 1; }; \
+	}
+	@$(VENV)/bin/python -m pip install --quiet --upgrade pip
+	@$(VENV)/bin/python -m kwt setup
 
 new: ## Create a new project folder            (make new P=my-run)
 	@test -n "$(P)" || { echo "Usage: make new P=<project-name>"; exit 1; }

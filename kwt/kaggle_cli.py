@@ -13,6 +13,7 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
+from pathlib import Path
 
 from .config import credentials
 
@@ -45,11 +46,22 @@ class Result:
 
 
 def _executable() -> str:
+    """Find the `kaggle` CLI, preferring the one beside this interpreter.
+
+    A venv's bin/ is not on PATH unless it has been activated, and a stale
+    `kaggle` from some other Python often is. Checking next to sys.executable
+    first keeps the CLI and its library in the same environment.
+    """
+    sibling = Path(sys.executable).parent / "kaggle"
+    if sibling.is_file() and os.access(sibling, os.X_OK):
+        return str(sibling)
+
     exe = shutil.which("kaggle")
     if exe:
         return exe
+
     raise KaggleError(
-        "The `kaggle` CLI is not on your PATH.\n"
+        "The `kaggle` CLI is not installed in this environment.\n"
         "Run `make setup`, or install it directly: pip install kaggle"
     )
 

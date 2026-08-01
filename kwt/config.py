@@ -14,13 +14,20 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-try:
-    import yaml
-except ImportError:  # pragma: no cover - surfaced with an actionable message
-    raise SystemExit(
-        "PyYAML is not installed.\n"
-        "Run `make setup` (or `pip install -r requirements.txt`) first."
-    )
+def _yaml():
+    """Import PyYAML lazily.
+
+    `kwt setup` is what *installs* PyYAML, so importing it at module scope would
+    make setup fail with an instruction to run setup.
+    """
+    try:
+        import yaml
+    except ImportError:  # pragma: no cover - surfaced with an actionable message
+        raise ConfigError(
+            "PyYAML is not installed.\n"
+            "Run `make setup` (or `pip install -r requirements.txt`) first."
+        ) from None
+    return yaml
 
 
 # --------------------------------------------------------------------------
@@ -293,6 +300,7 @@ def load(name: str | None = None, *, require_credentials: bool = True) -> Config
     root = PROJECTS_DIR / project
     config_path = root / CONFIG_NAME
 
+    yaml = _yaml()
     try:
         raw = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError as exc:

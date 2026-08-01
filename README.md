@@ -4,6 +4,12 @@ Write your notebooks in VS Code. Run them on Kaggle's free GPUs. Never touch the
 browser or memorise a `kaggle` CLI flag again.
 
 ```bash
+git clone https://github.com/<you>/kaggle-workspace-template
+cd kaggle-workspace-template
+
+cp .env.example .env   # paste in your Kaggle username + API key
+make setup             # builds .venv, installs deps, verifies the key
+
 make new P=titanic     # scaffold a project
 make push P=titanic    # upload + run it on Kaggle
 make output P=titanic  # bring the results back
@@ -74,9 +80,30 @@ cp .env.example .env      # then open .env and paste in your username + key
 make setup
 ```
 
-`make setup` installs the dependencies, writes `~/.kaggle/kaggle.json` with
-`600` permissions, and makes a live API call to confirm the key works. It prints
-your username on success.
+That's the whole install. `make setup`:
+
+1. creates a `.venv/` in the repo,
+2. installs `kaggle` and `PyYAML` into it,
+3. writes `~/.kaggle/kaggle.json` with `600` permissions,
+4. makes a live API call and prints your username on success.
+
+```
+==> Creating virtualenv in .venv/
+==> Installing Python dependencies
+==> Writing Kaggle credentials
+    wrote /Users/you/.kaggle/kaggle.json (permissions 600)
+==> Verifying credentials against Kaggle
+    authenticated as your-username
+```
+
+> **You never need to activate the venv.** Every `make` target reaches into
+> `.venv/bin/python` directly, and the tool resolves the `kaggle` CLI sitting
+> beside that interpreter — so a different `kaggle` earlier on your `PATH`
+> (a common leftover from `pip install --user`) can't shadow it.
+>
+> Prefer to manage your own environment? Skip `.venv` entirely — if it doesn't
+> exist, `make` falls back to whatever `python3` is active. Point setup at a
+> specific interpreter with `make setup PYTHON=/path/to/python3`.
 
 `.env` is gitignored. **Never commit your key** — if you do, revoke it
 immediately with *Expire API Token* on the same settings page.
