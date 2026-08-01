@@ -105,11 +105,40 @@ def run(*args: str, check: bool = True, echo: bool = False) -> Result:
     return result
 
 
+NETWORK_MARKERS = (
+    "max retries exceeded",
+    "connection refused",
+    "connection error",
+    "failed to establish",
+    "name or service not known",
+    "temporary failure in name resolution",
+    "nodename nor servname",
+    "proxyerror",
+    "sslerror",
+    "certificate verify failed",
+    "timed out",
+)
+
+
+def looks_like_network_failure(text: str) -> bool:
+    lowered = (text or "").lower()
+    return any(marker in lowered for marker in NETWORK_MARKERS)
+
+
 def whoami() -> str:
     """Verify credentials with a cheap authenticated call; return the username."""
     username, _ = credentials()
     result = run("kernels", "list", "--mine", "--page-size", "1", check=False)
     if not result.ok:
+        # Don't blame the credentials when the machine simply can't reach Kaggle.
+        if looks_like_network_failure(result.text):
+            raise KaggleError(
+                "Could not reach Kaggle — this looks like a network problem, "
+                "not a credential problem.\n"
+                f"{result.text}\n\n"
+                "Check your internet connection, VPN, or proxy settings "
+                "(HTTP_PROXY / HTTPS_PROXY), then run `make setup` again."
+            )
         raise KaggleError(
             "Kaggle rejected your credentials.\n"
             f"{result.text}\n\n"

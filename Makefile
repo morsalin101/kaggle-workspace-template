@@ -46,10 +46,17 @@ help: ## Show this help
 	@echo "  Example:  make push P=dl-finetune WAIT=1"
 	@echo ""
 
+# Probe by *running* the interpreter, not just checking the file exists — an
+# interrupted setup can leave a .venv whose python is present but unusable.
 setup: ## One-time: create .venv, install deps, write credentials, verify
-	@if [ -z "$(VENV_PY)" ]; then \
+	@if [ "$$(./$(VENV)/bin/python -c 'print(42)' 2>/dev/null)" != "42" ] && \
+	   [ "$$(./$(VENV)/Scripts/python.exe -c 'print(42)' 2>/dev/null)" != "42" ]; then \
+		if [ -e "$(VENV)" ]; then \
+			echo "==> $(VENV)/ exists but its interpreter does not run — recreating"; \
+			rm -rf "$(VENV)"; \
+		fi; \
 		echo "==> Creating virtualenv in $(VENV)/"; \
-		$(PYTHON) -m venv $(VENV) || { \
+		$(PYTHON) -m venv "$(VENV)" || { \
 			echo "Could not create a virtualenv with '$(PYTHON)'."; \
 			echo "On Debian/Ubuntu:  sudo apt install python3-venv"; \
 			echo "Or choose another interpreter:  make setup PYTHON=/path/to/python3"; \

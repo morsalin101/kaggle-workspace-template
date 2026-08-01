@@ -1,2 +1,12 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# These must keep LF even when checked out on Windows: a CRLF Makefile or shell
+# script breaks under WSL and Git Bash ("/bin/sh: ^M: command not found").
+Makefile   text eol=lf
+*.sh       text eol=lf
+*.yml      text eol=lf
+*.yaml     text eol=lf
+
+# Notebooks are JSON; keep them LF so diffs match across platforms.
+*.ipynb    text eol=lf
