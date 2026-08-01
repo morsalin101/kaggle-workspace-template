@@ -1,0 +1,47 @@
+# ---------------------------------------------------------------------------
+# example — Kaggle notebook settings
+# Everything Kaggle lets you configure lives here. Edit, then `make push`.
+# ---------------------------------------------------------------------------
+
+title: "Example"          # shown on Kaggle
+slug: example              # URL: kaggle.com/code/<your-username>/example
+
+notebook: notebook.ipynb  # the file that gets pushed
+language: python          # python | r | rmarkdown
+kernel_type: notebook     # notebook | script
+
+private: true             # false publishes the notebook
+accelerator: none         # none | gpu | tpu
+                          #   Which GPU (T4 x2 vs P100) is chosen in Kaggle's UI;
+                          #   the API can only turn the accelerator on or off.
+internet: true            # false = no network inside the run (required by some comps)
+
+# ---------------------------------------------------------------------------
+# Attach data. Add slugs here — never edit kernel-metadata.json by hand.
+# ---------------------------------------------------------------------------
+sources:
+  datasets: []            # - "owner/dataset-slug"      e.g. "zillow/zecon"
+  competitions: []        # - "competition-slug"        e.g. "titanic"
+  kernels: []             # - "owner/kernel-slug"       reuse another notebook's output
+  models: []              # - "owner/model/framework/variation/version"
+
+# ---------------------------------------------------------------------------
+# Your local Python code, shipped to Kaggle as a private dataset.
+# Write modules in src/, import them in the notebook, keep them unit-testable.
+# ---------------------------------------------------------------------------
+src:
+  enabled: true
+  dir: src
+  include_shared: false   # also bundle the repo-root shared/ folder
+  dataset_slug: null      # default: "<slug>-src"
+  dataset_title: null     # default: "<title> — source"
+  inject_bootstrap: true  # add the sys.path cell to the pushed copy only
+
+# ---------------------------------------------------------------------------
+push:
+  wait: false             # true = block until the Kaggle run finishes
+  poll_interval: 15       # seconds between status checks while waiting
+  timeout: null           # cap the run's length, in seconds
+
+output:
+  dir: outputs            # `make output` downloads here (gitignored)
