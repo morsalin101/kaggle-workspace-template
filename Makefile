@@ -19,7 +19,7 @@ MESSAGE_FLAG := $(if $(M),-m "$(M)",)
 TIMEOUT_FLAG := $(if $(TIMEOUT),--timeout $(TIMEOUT),)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup new validate push run status output pull list active clean check
+.PHONY: help setup new add rm sources validate push run status output pull list active clean check
 
 help: ## Show this help
 	@echo ""
@@ -38,6 +38,17 @@ setup: ## One-time: install deps, write ~/.kaggle/kaggle.json from .env, verify
 new: ## Create a new project folder            (make new P=my-run)
 	@test -n "$(P)" || { echo "Usage: make new P=<project-name>"; exit 1; }
 	@$(KWT) new $(P)
+
+add: ## Attach data by pasting its Kaggle link  (make add URL=<link>)
+	@test -n "$(URL)" || { echo 'Usage: make add URL="https://www.kaggle.com/datasets/owner/name"'; exit 1; }
+	@$(KWT) add $(URL) $(if $(P),-p $(P),)
+
+rm: ## Detach a source by link or slug         (make rm URL=<link>)
+	@test -n "$(URL)" || { echo 'Usage: make rm URL="owner/dataset-name"'; exit 1; }
+	@$(KWT) rm $(URL) $(if $(P),-p $(P),)
+
+sources: ## Show everything this project attaches
+	@$(KWT) sources $(P)
 
 validate: ## Check a project's config offline and preview its metadata
 	@$(KWT) validate $(P)

@@ -201,16 +201,67 @@ output:
 | `push.timeout` | `null` | Hard cap on run length, in seconds. |
 | `output.dir` | `outputs` | Where `make output` downloads to. |
 
-> **GPU type:** Kaggle's API can only switch the accelerator **on or off**.
-> Choosing *which* GPU (T4 ×2 vs P100) is a dropdown in Kaggle's own notebook
-> editor and cannot be set from here. Set `accelerator: gpu`, then pick the type
-> once in the UI — it sticks across pushes.
+### Choosing a GPU (T4 ×2 vs P100)
+
+Kaggle's API can only switch the accelerator **on or off** — the *type* is a
+dropdown in Kaggle's own notebook editor and is not part of the metadata. So:
+
+```yaml
+accelerator: gpu     # in config.yml — this part is required
+```
+
+```bash
+make push P=titanic
+```
+
+Then open the notebook on Kaggle, pick **GPU T4 ×2** in the sidebar, and hit
+**Save Version** to run it there.
+
+> **Set `accelerator: gpu` in `config.yml` even though you pick the type in the
+> UI.** `kernel-metadata.json` is authoritative on every push: if it says
+> `enable_gpu: false`, the next `make push` switches the accelerator back off,
+> whatever you chose in the browser. The *type* is not in the metadata, so it is
+> left alone — but the on/off switch is.
+
+Verified on a real run: with `accelerator: gpu` and nothing selected in the UI,
+Kaggle provisioned a **Tesla P100-PCIE-16GB**. That is the default; switching to
+T4 ×2 is the UI step above.
 
 ---
 
 ## Attaching data
 
-Add slugs to `config.yml` and push. Nothing else.
+**The easy way — paste the link.** Copy the dataset's URL out of your browser
+and hand it to `make add`:
+
+```bash
+make add URL="https://www.kaggle.com/datasets/mahmudulhasantasin/fracatlas-original-dataset"
+```
+
+```
+  + dataset: mahmudulhasantasin/fracatlas-original-dataset
+==> projects/example/config.yml updated
+    ...  ->  /kaggle/input/datasets/mahmudulhasantasin/fracatlas-original-dataset
+
+It attaches on the next push:  make push P=example
+```
+
+It writes the right slug into the right list in `config.yml`, keeping your
+comments intact. Competition, notebook, and model links work the same way — the
+link tells `kwt` which kind it is:
+
+```bash
+make add URL="https://www.kaggle.com/c/titanic"                          # competition
+make add URL="https://www.kaggle.com/code/someone/feature-eng"           # notebook output
+make add URL="https://www.kaggle.com/models/google/gemma/pyTorch/7b-it/1" # model
+```
+
+Then `make sources` shows everything attached, and `make rm URL=titanic`
+detaches by whatever short name you see there.
+
+### The manual way
+
+`make add` only edits `config.yml`, so you can always write it yourself:
 
 ```yaml
 sources:
@@ -325,6 +376,9 @@ Run `make` with no arguments to see this list in your terminal.
 |---|---|
 | `make setup` | Install deps, write credentials, verify them against Kaggle. |
 | `make new P=<name>` | Scaffold a new project folder. |
+| `make add URL=<link>` | Attach a dataset/competition/model by pasting its Kaggle link. |
+| `make rm URL=<link>` | Detach a source, by link or by the short name `make sources` shows. |
+| `make sources` | Show everything this project attaches. |
 | `make validate P=<name>` | Check the config offline and print the metadata that would be sent. |
 | `make push P=<name>` | Sync `src/`, upload the notebook, start the run. |
 | `make run P=<name>` | Push and block until the run finishes. |
@@ -341,6 +395,7 @@ Run `make` with no arguments to see this list in your terminal.
 | Flag | Applies to | Effect |
 |---|---|---|
 | `P=<name>` | most | Which project. Defaults to `projects/.active`. |
+| `URL=<link>` | `add`, `rm` | A Kaggle link, or a bare `owner/name` slug. |
 | `WAIT=1` | `push` | Block until the run finishes. |
 | `M="note"` | `push` | Version note for the `src` dataset. |
 | `TIMEOUT=<sec>` | `push` | Cap the run's length. |
@@ -367,6 +422,8 @@ kaggle-workspace-template/
 │   └── env.py                on_kaggle(), working_dir(), accelerator()
 ├── kwt/                      the CLI that wraps the kaggle tool
 │   ├── config.py             load + validate config.yml
+│   ├── links.py              Kaggle URL -> metadata slug
+│   ├── edit.py               patch config.yml without losing comments
 │   ├── metadata.py           config.yml -> kernel-metadata.json
 │   ├── notebook.py           bootstrap-cell injection
 │   ├── srcsync.py            src/ -> private Kaggle dataset

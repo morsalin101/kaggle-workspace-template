@@ -15,8 +15,18 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import __version__, config, kaggle_cli, metadata, notebook, scaffold, srcsync
-from .config import BUILD_DIR, REPO_ROOT, Config, ConfigError
+from . import (
+    __version__,
+    config,
+    edit,
+    kaggle_cli,
+    links,
+    metadata,
+    notebook,
+    scaffold,
+    srcsync,
+)
+from .config import BUILD_DIR, CONFIG_NAME, PROJECTS_DIR, REPO_ROOT, Config, ConfigError
 
 DONE_STATES = ("complete", "error", "cancel")
 
@@ -134,6 +144,104 @@ def cmd_list(args: argparse.Namespace) -> None:
         step("Your notebooks on Kaggle")
         result = kaggle_cli.run("kernels", "list", "--mine", check=False)
         say(result.text or "    (none)")
+
+
+# --------------------------------------------------------------------------
+# add / rm — attach data by pasting its Kaggle link
+# --------------------------------------------------------------------------
+
+
+def _config_path(project: str | None) -> tuple[str, Path]:
+    name = config.resolve_project(project)
+    return name, PROJECTS_DIR / name / CONFIG_NAME
+
+
+def cmd_add(args: argparse.Namespace) -> None:
+    name, path = _config_path(args.project)
+    added: list[tuple[str, str]] = []
+
+    for raw in args.urls:
+        try:
+            kind, slug = links.parse(raw)
+        except links.LinkError as exc:
+            fail(str(exc))
+
+        if edit.add_source(path, kind, slug):
+            say(f"  + {kind[:-1]}: {slug}")
+            added.append((kind, slug))
+        else:
+            say(f"  = already attached: {slug}")
+
+    if not added:
+        return
+
+    # Re-load so a malformed edit is caught here rather than at push time.
+    cfg = config.load(name, require_credentials=False)
+    step(f"projects/{name}/config.yml updated")
+    for kind, slug in added:
+        say(f"    {slug}  ->  {links.mount_hint(kind, slug)}")
+    say()
+    say(f"It attaches on the next push:  make push P={name}")
+    if any(kind == "competitions" for kind, _ in added):
+        say("Accept the competition's rules on its Kaggle page first, "
+            "or the run will fail with 403.")
+    del cfg
+
+
+def _resolve_attached(path: Path, raw: str) -> tuple[str, str]:
+    """Match `raw` against what is already attached, before parsing it as a link.
+
+    Lets you detach with the short name you see in `make sources` — a bare
+    'titanic' is ambiguous as a link but unambiguous as an attached source.
+    """
+    token = raw.strip().strip("/")
+    matches = [
+        (kind, slug)
+        for kind in links.KINDS
+        for slug in edit.list_items(path, kind)
+        if slug == token or slug.split("/")[-1] == token
+    ]
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        listed = "\n".join(f"  - {slug}  ({kind})" for kind, slug in matches)
+        raise ConfigError(f"'{raw}' matches more than one attached source:\n{listed}")
+    return links.parse(raw)
+
+
+def cmd_rm(args: argparse.Namespace) -> None:
+    name, path = _config_path(args.project)
+    for raw in args.urls:
+        try:
+            kind, slug = _resolve_attached(path, raw)
+        except links.LinkError as exc:
+            fail(str(exc))
+        if edit.remove_source(path, kind, slug):
+            say(f"  - {kind[:-1]}: {slug}")
+        else:
+            say(f"  ? not attached: {slug}")
+    config.load(name, require_credentials=False)
+    step(f"projects/{name}/config.yml updated")
+
+
+def cmd_sources(args: argparse.Namespace) -> None:
+    name, path = _config_path(args.project)
+    step(f"Attached to '{name}'")
+    empty = True
+    for kind in links.KINDS:
+        items = edit.list_items(path, kind)
+        if not items:
+            continue
+        empty = False
+        say(f"  {kind}:")
+        for slug in items:
+            say(f"    - {slug}")
+    cfg = config.load(name, require_credentials=False)
+    if cfg.src_enabled:
+        empty = False
+        say(f"  your code (automatic):\n    - {cfg.src_dataset_id}")
+    if empty:
+        say("  (nothing yet — make add P=%s URL=<kaggle link>)" % name)
 
 
 # --------------------------------------------------------------------------
@@ -391,6 +499,19 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("list", help="list local projects (and optionally remote ones)")
     s.add_argument("--remote", action="store_true", help="also list your Kaggle kernels")
     s.set_defaults(func=cmd_list)
+
+    s = sub.add_parser("add", help="attach a dataset/competition by pasting its link")
+    s.add_argument("urls", nargs="+", metavar="URL")
+    s.add_argument("-p", "--project", default=None)
+    s.set_defaults(func=cmd_add)
+
+    s = sub.add_parser("rm", help="detach a source by link or slug")
+    s.add_argument("urls", nargs="+", metavar="URL")
+    s.add_argument("-p", "--project", default=None)
+    s.set_defaults(func=cmd_rm)
+
+    s = with_project(sub.add_parser("sources", help="list what this project attaches"))
+    s.set_defaults(func=cmd_sources)
 
     s = with_project(sub.add_parser("validate", help="check config offline"))
     s.set_defaults(func=cmd_validate)
